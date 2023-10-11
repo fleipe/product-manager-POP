@@ -104,6 +104,70 @@ def mine(driver):
     else:
         info["Mismo_precio_por_variante"] = "None"
 
+    precios_fixos = driver.find_elements(By.CSS_SELECTOR, "div[label = '€']")
+    info["Precio"] = []
+    info["Oferta"] = []
+    if precios_fixos:
+        i = 0
+        for precios in precios_fixos:
+            if precios.find_element(By.CSS_SELECTOR, "input").get_attribute("id").find("discountlessPrice") != -1:
+                print("Precio found!")
+                info["Precio"].append(precios.find_element(By.CSS_SELECTOR, "input").get_attribute("value"))
+                i = i + 1
+            elif precios.find_element(By.CSS_SELECTOR, "input").get_attribute("id").find("discountedPrice") != -1:
+                print("Oferta found!")
+                info["Oferta"].append(precios.find_element(By.CSS_SELECTOR, "input").get_attribute("value"))
+                i = i + 1
+            else:
+                print("Precio not found!")
+                info["Precio"].append("?")
+                info["Oferta"].append("?")
+                i = i + 1
+
+    compra_sin_stock = driver.find_elements(By.CSS_SELECTOR, "input[id = 'product-allow-no-stock-buy']")
+    if compra_sin_stock:
+        info["Compra Sin Stock"] = ""
+        if compra_sin_stock[0].get_attribute("outerHTML").find("checked") != -1:
+            info["Compra Sin Stock"] = "True"
+            info["Tiempo Adicional"] = driver.find_element(By.CSS_SELECTOR, "input[id = 'product-no-stock-days']").get_attribute(
+                "value")
+        else:
+            info["Compra Sin Stock"] = "False"
+
+    pesos = driver.find_elements(By.CSS_SELECTOR, "input[type = 'number']")
+    info["Peso"] = []
+    for peso in pesos:
+        if peso.get_attribute("outerHTML").find("weight") != -1:
+            print(peso.get_attribute("value"))
+            info["Peso"].append(peso.get_attribute("value"))
+            break
+    altos = driver.find_elements(By.CSS_SELECTOR, "input[type = 'number']")
+    info["Alto"] = []
+    for alto in altos:
+        if alto.get_attribute("id").find("height") != -1:
+            info["Alto"].append(alto.get_attribute("value"))
+            break
+    anchos = driver.find_elements(By.CSS_SELECTOR, "input[type = 'number']")
+    info["Ancho"] = []
+    for ancho in anchos:
+        if ancho.get_attribute("id").find("width") != -1:
+            info["Ancho"].append(ancho.get_attribute("value"))
+            break
+    fondos = driver.find_elements(By.CSS_SELECTOR, "input[type = 'number']")
+    info["Fondo"] = []
+    for fondo in fondos:
+        if fondo.get_attribute("id").find("depth") != -1:
+            info["Fondo"].append(fondo.get_attribute("value"))
+            break
+
+    visible = driver.find_elements(By.CSS_SELECTOR, "input[id = 'product-enabled']")
+    if visible:
+        info["Visible"] = ""
+        if visible[0].get_attribute("outerHTML").find("checked") != -1:
+            info["Visible"] = "True"
+        else:
+            info["Visible"] = "False"
+
     with open(f"Cloner/{info['hash']}", 'w', encoding='utf-8') as json_file:
         json.dump(info, json_file, ensure_ascii=False, indent=4)
 

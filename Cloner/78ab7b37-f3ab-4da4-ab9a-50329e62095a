@@ -25,5 +25,25 @@
         "10000",
         "10000"
     ],
-    "Mismo_precio_por_variante": "True"
+    "Mismo_precio_por_variante": "True",
+    "Precio": [
+        "16"
+    ],
+    "Oferta": [
+        ""
+    ],
+    "Compra Sin Stock": "False",
+    "Peso": [
+        "200"
+    ],
+    "Alto": [
+        "40"
+    ],
+    "Ancho": [
+        "10"
+    ],
+    "Fondo": [
+        "10"
+    ],
+    "Visible": "False"
 }
