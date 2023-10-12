@@ -1,8 +1,13 @@
 import json
+import os
 import time
+import urllib.request
+
+import pyautogui
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 
 
 def initialize_driver(headless=False):
@@ -11,7 +16,8 @@ def initialize_driver(headless=False):
     if headless:
         options.add_argument("--headless")
 
-    return webdriver.Chrome(options=options)
+    # return webdriver.Chrome(options=options)
+    return webdriver.Firefox()
 
 
 def verify_login(driver, locator, cred):
@@ -129,7 +135,8 @@ def mine(driver):
         info["Compra Sin Stock"] = ""
         if compra_sin_stock[0].get_attribute("outerHTML").find("checked") != -1:
             info["Compra Sin Stock"] = "True"
-            info["Tiempo Adicional"] = driver.find_element(By.CSS_SELECTOR, "input[id = 'product-no-stock-days']").get_attribute(
+            info["Tiempo Adicional"] = driver.find_element(By.CSS_SELECTOR,
+                                                           "input[id = 'product-no-stock-days']").get_attribute(
                 "value")
         else:
             info["Compra Sin Stock"] = "False"
@@ -172,11 +179,219 @@ def mine(driver):
         json.dump(info, json_file, ensure_ascii=False, indent=4)
 
 
+def creator(driver):
+    time.sleep(2)
+    with open("Cloner/78ab7b37-f3ab-4da4-ab9a-50329e62095a", 'r', encoding='utf-8') as json_file:
+        product = json.load(json_file)
+
+    # name
+    product_name = driver.find_elements(By.CSS_SELECTOR, "input")
+    if product_name:
+        for input in product_name:
+            if input.get_attribute("id").find("product-name") != -1:
+                input.send_keys(product["Nombre"])
+                break
+
+    # iframe
+    product_desc = driver.find_elements(By.CSS_SELECTOR, "iframe")
+    if product_desc:
+        for input in product_desc:
+            if input.get_attribute("id").find("tiny-react") != -1:
+                driver.switch_to.frame(input)
+                box = driver.find_element(By.CSS_SELECTOR, "body[id = 'tinymce']")
+                box.click()
+                box.send_keys(product["Descripción"])
+                driver.switch_to.default_content()
+                break
+
+    # pics
+    fotos = product["Fotografías"]
+    img_path = []
+    i = 0
+    for fotourl in fotos:
+        print("Downloading " + fotourl)
+        img_path.append(urllib.request.urlretrieve(fotourl, f"Cloner/img/img{i}.png")[0])
+        print(img_path[i])
+        i = i + 1
+
+    # upload
+    ospath = os.getcwd()
+    bt = driver.find_elements(By.CSS_SELECTOR, "button")
+    if bt:
+        for button in bt:
+            if button.get_attribute("class").find("sc-dyTUbJ dKjDkb") != -1:
+                for img in img_path:
+                    button.send_keys(Keys.ENTER)
+                    time.sleep(2)
+                    pyautogui.write(ospath)
+                    time.sleep(2)
+                    pyautogui.press('enter')
+                    time.sleep(2)
+                    pyautogui.write(img.replace('/', '\\'))
+                    time.sleep(2)
+                    pyautogui.press('enter')
+                    time.sleep(2)
+                break
+
+    # delete
+    for path in img_path:
+        print("Deleting " + ospath + "\\" + path.replace('/', '\\'))
+        os.remove(path)
+
+    # Características
+    carac = product["Características"]
+    btn = driver.find_elements(By.CSS_SELECTOR, "button[class = 'sc-ewnqHT bVbYNJ']")
+    if btn:
+        i = 0
+        for car in carac:
+            btn[0].send_keys(Keys.ENTER)
+            txtarea = driver.find_elements(By.CSS_SELECTOR, "textarea")
+            for input in txtarea:
+                if input.get_attribute("name").find(f"features[{i}]") != -1:
+                    input.send_keys(car)
+                    i = i + 1
+                    break
+
+    # Category
+    cat = product["Categoría"]
+    btn = driver.find_elements(By.CSS_SELECTOR, "input[class = 'react-select__input']")
+    if btn:
+        btn[0].send_keys(cat)
+        time.sleep(2)
+        btn[0].send_keys(Keys.ENTER)
+
+    # TODO: Marca
+
+    # variantes
+    var = product["Variantes"]
+    btn = driver.find_elements(By.CSS_SELECTOR, "button[class = 'sc-ewnqHT iPHMCZ']")
+    if btn:
+        btn[1].send_keys(Keys.ENTER)
+        driver.find_element(By.CSS_SELECTOR, "nav[class = 'sc-kGRGSO jyEHoA']").find_element(By.CSS_SELECTOR,
+                                                                                             "button").send_keys(
+            Keys.ENTER)
+        time.sleep(1)
+        tams = driver.find_elements(By.CSS_SELECTOR, "label[class = 'sc-hQPFnu jnXvvm']")
+        for tam in tams:
+            tam.click()
+            time.sleep(0.5)
+        aceptar = driver.find_elements(By.CSS_SELECTOR, "footer[class = 'sc-gACFrS hFAfWs']")
+        if aceptar:
+            aceptar[0].find_elements(By.CSS_SELECTOR, "button")[0].click()
+            time.sleep(1)
+
+    # mismo precio por variante
+    mismo_precio = product["Mismo_precio_por_variante"]
+    btn = driver.find_elements(By.CSS_SELECTOR, "input[id = 'product-same-price']")
+    if btn:
+        if btn[0].get_attribute("outerHTML").find("checked") != -1:
+            if mismo_precio == "False":
+                btn[0].click()
+                time.sleep(1)
+        else:
+            if mismo_precio == "True":
+                btn[0].click()
+                time.sleep(1)
+
+    # stock
+    if mismo_precio == "True":
+        stock = product["Stock"]
+        i = 0
+        for stock in stock:
+            input = driver.find_elements(By.CSS_SELECTOR, "input[type = 'number']")
+            for input in input:
+                if input.get_attribute("outerHTML").find(f"variants[{i}].availability.stock") != -1:
+                    input.send_keys(stock)
+                    i = i + 1
+                    break
+
+    # dimensiones
+    if mismo_precio:
+        precio = product["Precio"]
+        if precio:
+            input = driver.find_elements(By.CSS_SELECTOR, "input[type = 'number']")
+            for input in input:
+                if input.get_attribute("outerHTML").find("discountless") != -1:
+                    input.send_keys(precio[0])
+                    break
+        oferta = product["Oferta"]
+        if oferta:
+            input = driver.find_elements(By.CSS_SELECTOR, "input[type = 'number']")
+            for input in input:
+                if input.get_attribute("outerHTML").find("discounted") != -1:
+                    input.send_keys(oferta[0])
+                    break
+        peso = product["Peso"]
+        if peso:
+            input = driver.find_elements(By.CSS_SELECTOR, "input[type = 'number']")
+            for input in input:
+                if input.get_attribute("outerHTML").find("variants[0].weight") != -1:
+                    input.send_keys(peso[0])
+                    break
+        alto = product["Alto"]
+        if alto:
+            input = driver.find_elements(By.CSS_SELECTOR, "input[type = 'number']")
+            for input in input:
+                if input.get_attribute("outerHTML").find("height") != -1:
+                    input.send_keys(alto[0])
+                    break
+        ancho = product["Ancho"]
+        if ancho:
+            input = driver.find_elements(By.CSS_SELECTOR, "input[type = 'number']")
+            for input in input:
+                if input.get_attribute("outerHTML").find("width") != -1:
+                    input.send_keys(ancho[0])
+                    break
+        fondo = product["Fondo"]
+        if fondo:
+            input = driver.find_elements(By.CSS_SELECTOR, "input[type = 'number']")
+            for input in input:
+                if input.get_attribute("outerHTML").find("depth") != -1:
+                    input.send_keys(fondo[0])
+                    break
+    # TODO: testar mismo_precio false
+    else:
+        peso = product["Peso"]
+        if peso:
+            input = driver.find_elements(By.CSS_SELECTOR, "input[type = 'number']")
+            i = 0
+            for peso in peso:
+                for input in input:
+                    if input.get_attribute("outerHTML").find(f"variants[{i}].weight") != -1:
+                        input.send_keys(peso)
+                        i = i + 1
+                        break
+
+    # visivel TODO: testar
+    visi = product["Visible"]
+    if visi:
+        input = driver.find_elements(By.CSS_SELECTOR, "input[id = 'product-enabled']")
+        for input in input:
+            if input.get_attribute("outerHTML").find("checked") != -1:
+                break
+            else:
+                input.click()
+                break
+    else:
+        input = driver.find_elements(By.CSS_SELECTOR, "input[id = 'product-enabled']")
+        for input in input:
+            if input.get_attribute("outerHTML").find("checked") != -1:
+                input.click()
+                break
+            else:
+                break
+
+    # TODO: guardar
+
+
 if __name__ == "__main__":
     keys = {"usr": "toni.tort92@gmail.com", "pwd": "Superantonio92!"}
     driver1 = initialize_driver()
     access_product(driver1, "78ab7b37-f3ab-4da4-ab9a-50329e62095a", keys)
-    input("Press Enter to mine...")
-    mine(driver1)
+    # input("Press Enter to continue...")
+    # mine(driver1)
+    driver1.get("https://www.posterage.com/admin/catalogue/products/create")
+    input("Press Enter to continue...")
+    creator(driver1)
 
     input("Press Enter to close the browser...")
