@@ -8,6 +8,15 @@ from pop import login, mine, creator
 
 class AsyncApp:
     def __init__(self, root):
+        """
+        The __init__ function is called when the class is instantiated.
+        It sets up the instance of the class, and defines all attributes that will be used by instances of this class.
+
+
+        :param self: Represent the instance of the class
+        :param root: Pass the window (Tk) object to the class
+        :doc-author: Felipe Linares
+        """
         self.root = root
         self.root.title("POP_robot")
         self.keys = {"usr": "toni.tort92@gmail.com", "pwd": "Superantonio92!"}
@@ -35,16 +44,34 @@ class AsyncApp:
         self.create_button.grid(row=3, column=1, padx=10, pady=10)
 
     def save_data_async(self):
+        """
+        The save_data_async function is a wrapper for the save_data function.
+        It starts a new thread to run the save_data function in, so that it can be called asynchronously.
+
+        :param self: Represent the instance of the object that calls this method
+        :doc-author: Felipe Linares
+        """
         threading.Thread(target=self.save_data).start()
 
     def create_data_async(self):
+        """
+        The create_data_async function is a wrapper for the create_data function.
+        It starts a new thread to run the create_data function in, so that it can be called asynchronously.
+
+        :param self: Represent the instance of the object that calls this method
+        :doc-author: Felipe Linares
+        """
         threading.Thread(target=self.create_data).start()
 
     def save_data(self):
-        # Simulating a time-consuming task
-        num_value = self.int_var.get()
-        is_visible = self.is_visible_var.get()
-        has_images = self.images_var.get()
+        """
+        The save_data function is called when the user clicks on the "Save Data" button.
+        It calls a function from another file, mine(), which scrapes data from the website and saves it to a json file.
+        The filename of that json file is then saved as an attribute of this class, so that it can be used in other functions.
+
+        :param self: Represent the instance of the class
+        :doc-author: Felipe Linares
+        """
         print("Saving")
         self.filename = mine(self.driver1)
 
@@ -52,7 +79,14 @@ class AsyncApp:
         messagebox.showinfo("Save Data", f"Data saved as {self.filename}.")
 
     def create_data(self):
-        # Simulating a time-consuming task
+        """
+        The create_data function is the function that actually creates the data.
+        It takes in a number of products to create, and then loops through creating each product.
+        The loop will continue until it has created all the products specified by num_value.
+
+        :param self: Represent the instance of the object that calls this method
+        :doc-author: Felipe Linares
+        """
         num_value = self.int_var.get()
         print(f"Creating {num_value} products")
         i = 0
@@ -65,7 +99,21 @@ class AsyncApp:
         print(f"Data creation loop completed.")
         messagebox.showinfo("Create Data", "Data creation loop completed.")
 
-if __name__ == "__main__":
+
+def main():
+    """
+    The main function is the entry point for the program.
+    It creates a Tk root widget, instantiates an AsyncApp object, and calls mainloop on it.
+
+
+    :return: None
+    :doc-author: Felipe Linares
+    """
     root = tk.Tk()
     app = AsyncApp(root)
+    root.attributes("-topmost", True)
     root.mainloop()
+
+
+if __name__ == "__main__":
+    main()

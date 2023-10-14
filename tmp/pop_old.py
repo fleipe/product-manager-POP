@@ -4,37 +4,35 @@ import time
 import urllib.request
 import pyautogui
 from selenium import webdriver
-from selenium.webdriver import Keys
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from slugify import slugify
 
 
-def initialize_driver():
-    """
-    The initialize_driver function initializes a webdriver object.
-        Args:
-            None
+def initialize_driver(headless=False):
+    options = Options()
+    options.add_argument("--detached")
+    if headless:
+        options.add_argument("--headless")
 
-    :return: A driver object
-    :doc-author: Felipe Linares
-    """
-    # return webdriver.Firefox(options=options)
-    print("initializing driver")
+    # return webdriver.Chrome(options=options)
     return webdriver.Firefox()
 
 
-def login(cred, driver=None):
-    """
-    The login function takes in a dictionary of credentials and logs into the Yupop website.
-        Args:
-            cred (dict): A dictionary containing the username and password for logging into Yupop.
-                The keys are "usr" and "pwd".
+def verify_login(driver, locator, cred):
+    time.sleep(5)
+    element = driver.find_elements(By.CSS_SELECTOR, locator)
+    if not element:
+        print("trying to login")
+        login(driver, cred)
+        verify_login(driver, locator, cred)
+    else:
+        print("locator found!")
+        return True
 
-    :param cred: Pass the credentials to login
-    :param driver: Pass the driver object to the function
-    :return: A driver object
-    :doc-author: Felipe Linares
-    """
+
+def login(cred, driver=None):
     try:
         if driver is None:
             driver = initialize_driver()
@@ -44,7 +42,6 @@ def login(cred, driver=None):
             driver.get(f"https://accounts.yupop.com/login")
             time.sleep(2)
         if driver.current_url == "https://accounts.yupop.com/login":
-            print("login page")
             user = driver.find_elements(By.CSS_SELECTOR, "input[id = 'email']")
             if user:
                 user[0].send_keys(cred["usr"])
@@ -57,6 +54,7 @@ def login(cred, driver=None):
                     print("login successful")
                 else:
                     print("login failed")
+                    login(cred, driver)
             else:
                 time.sleep(5)
                 user = driver.find_elements(By.CSS_SELECTOR, "input[id = 'email']")
@@ -64,7 +62,6 @@ def login(cred, driver=None):
                     login(cred, driver)
 
     except Exception as e:
-        print("Exception on login:\n")
         print(e)
     finally:
         # return driver
@@ -72,18 +69,23 @@ def login(cred, driver=None):
         return driver
 
 
-def mine(driver, product_url=None):
-    """
-    The mine function takes a driver and an optional product_url.
-    If no url is provided, the function will mine the current page of the driver.
-    The function returns a dictionary with all relevant information about the product.
+def access_product(driver, product_hash, cred):
+    try:
+        # Open the product edit page
+        driver.get(f"https://accounts.yupop.com/login")
+        time.sleep(2)
+        login(driver, cred)
+        time.sleep(5)
+        input("Press Enter to continue...")
+        print("logged in")
+        driver.get(f"https://www.posterage.com/admin/catalogue/products/edit/{product_hash}")
 
-    :param driver: Control the browser
-    :param product_url: Pass the product url to the function
-    :return: The name of the json file
-    :doc-author: Felipe Linares
-    """
-    global info
+    finally:
+        # return driver
+        return driver
+
+
+def mine(driver, product_url=None):
     try:
         if product_url is None:
             product_url = driver.current_url
@@ -95,39 +97,33 @@ def mine(driver, product_url=None):
 
         # check
         if driver.find_elements(By.CSS_SELECTOR, "input[id = 'product-enabled']"):
-            print("Starting data miner.")
             info = {}
             info["url"] = driver.current_url
             info["hash"] = driver.current_url.replace("https://www.posterage.com/admin/catalogue/products/edit/", "")
-            info["Nombre"] = driver.find_element(By.CSS_SELECTOR, "input[name = 'name']").get_attribute(
-                "value").replace(" ", "_")
+            info["Nombre"] = driver.find_element(By.CSS_SELECTOR, "input[name = 'name']").get_attribute("value").replace(" ", "_")
 
             # iframe
-            print("Bypassing iframe.")
             iframe_element = driver.find_element(By.CSS_SELECTOR, "iframe[title = 'Rich Text Area']")
             driver.switch_to.frame(iframe_element)
             info["Descripción"] = driver.find_element(By.CSS_SELECTOR, "body[id = 'tinymce']").find_element(By.TAG_NAME,
                                                                                                             "p").text
-            print("Switching back from iframe.")
             driver.switch_to.default_content()
 
-            print("Searching for images.")
             album = driver.find_elements(By.CSS_SELECTOR, "figure[class = 'sc-kjUpzh jEwzPv']")
             info["Fotografías"] = []
             for foto in album:
                 info["Fotografías"].append("https://www.posterage.com" + foto.get_attribute("src"))
 
-            print("Searching for features.")
             caract = driver.find_elements(By.CSS_SELECTOR, "textarea[class = 'sc-idvBfp fnPvlx']")
             info["Características"] = []
             for destaque in caract:
                 info["Características"].append(destaque.get_attribute("id"))
 
-            print("Searching for categories.")
+            # TODO: Universalizar
             info["Categoría"] = "TIENDA"
             info["Marca"] = ""
 
-            print("Searching for variants.")
+            # Variantes TODO: Universalizar
             var_check = driver.find_elements(By.CSS_SELECTOR, "section[class = 'sc-vdgyJ jcOiBB']")
             if var_check:
                 variantes = driver.find_elements(By.CSS_SELECTOR, "div[class = 'sc-fZUakH cvFGs']")
@@ -142,7 +138,6 @@ def mine(driver, product_url=None):
                         "value"))
 
             # Mismo precio por variante
-            print("Searching for same price opt.")
             if driver.find_elements(By.CSS_SELECTOR, "input[id = 'product-same-price']"):
                 mismo_precio_por_variante = driver.find_element(By.CSS_SELECTOR, "input[id = 'product-same-price']")
                 if mismo_precio_por_variante.get_attribute("outerHTML").find("checked") != -1:
@@ -152,20 +147,17 @@ def mine(driver, product_url=None):
             else:
                 info["Mismo_precio_por_variante"] = "None"
 
-            print("Searching for prices.")
             precios_fixos = driver.find_elements(By.CSS_SELECTOR, "div[label = '€']")
             info["Precio"] = []
             info["Oferta"] = []
             if precios_fixos:
                 i = 0
                 for precios in precios_fixos:
-                    if precios.find_element(By.CSS_SELECTOR, "input").get_attribute("id").find(
-                            "discountlessPrice") != -1:
+                    if precios.find_element(By.CSS_SELECTOR, "input").get_attribute("id").find("discountlessPrice") != -1:
                         print("Precio found!")
                         info["Precio"].append(precios.find_element(By.CSS_SELECTOR, "input").get_attribute("value"))
                         i = i + 1
-                    elif precios.find_element(By.CSS_SELECTOR, "input").get_attribute("id").find(
-                            "discountedPrice") != -1:
+                    elif precios.find_element(By.CSS_SELECTOR, "input").get_attribute("id").find("discountedPrice") != -1:
                         print("Oferta found!")
                         info["Oferta"].append(precios.find_element(By.CSS_SELECTOR, "input").get_attribute("value"))
                         i = i + 1
@@ -175,7 +167,6 @@ def mine(driver, product_url=None):
                         info["Oferta"].append("?")
                         i = i + 1
 
-            print("Searching for stock.")
             compra_sin_stock = driver.find_elements(By.CSS_SELECTOR, "input[id = 'product-allow-no-stock-buy']")
             if compra_sin_stock:
                 info["Compra Sin Stock"] = ""
@@ -187,7 +178,6 @@ def mine(driver, product_url=None):
                 else:
                     info["Compra Sin Stock"] = "False"
 
-            print("Searching for dimensions.")
             pesos = driver.find_elements(By.CSS_SELECTOR, "input[type = 'number']")
             info["Peso"] = []
             for peso in pesos:
@@ -214,7 +204,6 @@ def mine(driver, product_url=None):
                     info["Fondo"].append(fondo.get_attribute("value"))
                     break
 
-            print("Searching for visibility.")
             visible = driver.find_elements(By.CSS_SELECTOR, "input[id = 'product-enabled']")
             if visible:
                 info["Visible"] = ""
@@ -233,30 +222,11 @@ def mine(driver, product_url=None):
     except Exception as e:
         print(e)
 
-    finally:
-        return f"{slugify(info['Nombre'])}"
-
-
-def creator(driver, file, is_visible=bool, has_images=bool):
-    """
-    The creator function takes a driver, file, is_visible and has_images as arguments.
-        The function loads the product data from the json file provided in the argument.
-        It then writes all of that data into Posterage's website using Selenium Webdriver.
-
-    :param driver: Access the browser
-    :param file: Load the product data from a json file
-    :param is_visible: Set the product as visible or not
-    :param has_images: Determine if the product has images or not
-    :return: The name of the product
-    :doc-author: Felipe Linares
-    """
-    driver.get("https://www.posterage.com/admin/catalogue/products/create")
+def creator(driver):
     time.sleep(2)
-    print(f"Loading product data from {file}.")
-    with open(f"Cloner/{file}", 'r', encoding='utf-8') as json_file:
+    with open("../Cloner/78ab7b37-f3ab-4da4-ab9a-50329e62095a", 'r', encoding='utf-8') as json_file:
         product = json.load(json_file)
 
-    print("Writing data.")
     # name
     product_name = driver.find_elements(By.CSS_SELECTOR, "input")
     if product_name:
@@ -266,7 +236,6 @@ def creator(driver, file, is_visible=bool, has_images=bool):
                 break
 
     # iframe
-    print("Bypassing iframe again.")
     product_desc = driver.find_elements(By.CSS_SELECTOR, "iframe")
     if product_desc:
         for input in product_desc:
@@ -277,48 +246,42 @@ def creator(driver, file, is_visible=bool, has_images=bool):
                 box.send_keys(product["Descripción"])
                 driver.switch_to.default_content()
                 break
-    print("Back from iframe.")
 
-    if has_images:
-        print("Downloading images.")
-        # pics
-        fotos = product["Fotografías"]
-        img_path = []
-        i = 0
-        for fotourl in fotos:
-            print("Downloading " + fotourl)
-            print(f"{i+1}/{len(fotos)}")
-            img_path.append(urllib.request.urlretrieve(fotourl, f"Cloner/img/img{i}.png")[0])
-            print(img_path[i])
-            i = i + 1
+    # pics
+    fotos = product["Fotografías"]
+    img_path = []
+    i = 0
+    for fotourl in fotos:
+        print("Downloading " + fotourl)
+        img_path.append(urllib.request.urlretrieve(fotourl, f"Cloner/img/img{i}.png")[0])
+        print(img_path[i])
+        i = i + 1
 
-        # upload
-        ospath = os.getcwd()
-        bt = driver.find_elements(By.CSS_SELECTOR, "button")
-        if bt:
-            for button in bt:
-                if button.get_attribute("class").find("sc-dyTUbJ dKjDkb") != -1:
-                    for img in img_path:
-                        button.send_keys(Keys.ENTER)
-                        time.sleep(1)
-                        pyautogui.write(ospath)
-                        time.sleep(0.5)
-                        pyautogui.press('enter')
-                        time.sleep(0.5)
-                        pyautogui.write(img.replace('/', '\\'))
-                        time.sleep(0.5)
-                        pyautogui.press('enter')
-                        time.sleep(1)
-                    break
+    # upload
+    ospath = os.getcwd()
+    bt = driver.find_elements(By.CSS_SELECTOR, "button")
+    if bt:
+        for button in bt:
+            if button.get_attribute("class").find("sc-dyTUbJ dKjDkb") != -1:
+                for img in img_path:
+                    button.send_keys(Keys.ENTER)
+                    time.sleep(2)
+                    pyautogui.write(ospath)
+                    time.sleep(2)
+                    pyautogui.press('enter')
+                    time.sleep(2)
+                    pyautogui.write(img.replace('/', '\\'))
+                    time.sleep(2)
+                    pyautogui.press('enter')
+                    time.sleep(2)
+                break
 
-        # delete
-        print("Deleting images from pc.")
-        for path in img_path:
-            print("Deleting " + ospath + "\\" + path.replace('/', '\\'))
-            os.remove(path)
+    # delete
+    for path in img_path:
+        print("Deleting " + ospath + "\\" + path.replace('/', '\\'))
+        os.remove(path)
 
     # Características
-    print("Adding features.")
     carac = product["Características"]
     btn = driver.find_elements(By.CSS_SELECTOR, "button[class = 'sc-ewnqHT bVbYNJ']")
     if btn:
@@ -339,6 +302,8 @@ def creator(driver, file, is_visible=bool, has_images=bool):
         btn[0].send_keys(cat)
         time.sleep(2)
         btn[0].send_keys(Keys.ENTER)
+
+    # TODO: Marca
 
     # variantes
     var = product["Variantes"]
@@ -372,7 +337,6 @@ def creator(driver, file, is_visible=bool, has_images=bool):
                 time.sleep(1)
 
     # stock
-    print("Adding stock.")
     if mismo_precio == "True":
         stock = product["Stock"]
         i = 0
@@ -385,7 +349,6 @@ def creator(driver, file, is_visible=bool, has_images=bool):
                     break
 
     # dimensiones
-    print("Adding dimensions.")
     if mismo_precio:
         precio = product["Precio"]
         if precio:
@@ -429,6 +392,7 @@ def creator(driver, file, is_visible=bool, has_images=bool):
                 if input.get_attribute("outerHTML").find("depth") != -1:
                     input.send_keys(fondo[0])
                     break
+    # TODO: testar mismo_precio false
     else:
         peso = product["Peso"]
         if peso:
@@ -441,18 +405,19 @@ def creator(driver, file, is_visible=bool, has_images=bool):
                         i = i + 1
                         break
 
-    visi = is_visible
+    # visivel TODO: testar
+    visi = product["Visible"]
     blocked = True
     edited = False
     while blocked:
         try:
-            if visi:
+            if visi == "True":
                 input = driver.find_elements(By.CSS_SELECTOR, "input[id = 'product-enabled']")
                 for input in input:
                     if input.get_attribute("outerHTML").find("checked") != -1:
                         blocked = False
                         if edited:
-                            driver.execute_script("document.getElementsByTagName('footer').style.display = 'grid';")
+                            driver.execute_script("document.getElementByTagName('footer').style.display = 'grid';")
                             edited = False
                         break
                     else:
@@ -460,7 +425,7 @@ def creator(driver, file, is_visible=bool, has_images=bool):
                         print("Visible clicked")
                         blocked = False
                         if edited:
-                            driver.execute_script("document.getElementsByTagName('footer').style.display = 'grid';")
+                            driver.execute_script("document.getElementByTagName('footer').style.display = 'grid';")
                             edited = False
                         break
             else:
@@ -471,40 +436,53 @@ def creator(driver, file, is_visible=bool, has_images=bool):
                         print("Visible clicked")
                         blocked = False
                         if edited:
-                            driver.execute_script("document.getElementsByTagName('footer').style.display = 'grid';")
+                            driver.execute_script("document.getElementByTagName('footer').style.display = 'grid';")
                             edited = False
                         break
                     else:
                         blocked = False
                         if edited:
-                            driver.execute_script("document.getElementsByTagName('footer').style.display = 'grid';")
+                            driver.execute_script("document.getElementByTagName('footer').style.display = 'grid';")
                             edited = False
                         break
         except:
             print("blocked")
-            driver.execute_script("document.getElementsByTagName('footer').style.display = 'none';")
+            footer = driver.find_element(driver, "footer")
+            driver.execute_script("document.getElementByTagName('footer').style.display = 'none';")
             edited = True
 
     # guardar
+    button = driver.find_elements(By.CSS_SELECTOR, "button[type = 'submit']")
+    print(len(button))
+    button[0].click()
 
-    blocked = True
-    while blocked:
-        try:
-            button = driver.find_elements(By.CSS_SELECTOR, "button[type = 'submit']")
-            time.sleep(1)
-            button[0].click()
-            time.sleep(1)
-            blocked = False
-        except:
-            print("blocked")
-            script = """
-            e = document.getElementsByClassName('sc-kJpdyg fCbVSs')[0];
-            e.style.display = 'none';
-            """
-            driver.execute_script(script)
 
-    while 1:
-        time.sleep(1)
-        if driver.current_url != "www.posterage.com/admin/catalogue/products/create":
-            time.sleep(1)
-            break
+def delete(driver, product):
+    product = product.replace("https://www.posterage.com/admin/catalogue/products/edit/", "")
+    caneta = driver.find_elements(By.CSS_SELECTOR, "a")
+    if caneta:
+        for pen in caneta:
+            if pen.get_attribute("outerHTML").find(product) != -1:
+                pai = pen.find_element(By.XPATH, "..")
+                pai.find_element(By.CSS_SELECTOR, "button").click()
+                links = driver.find_elements(By.CSS_SELECTOR, "a")
+                for link in links:
+                    if link.get_attribute("outerHTML").find("Eliminar") != -1:
+                        link2 = link.find_element(By.CSS_SELECTOR, "div").find_element(By.CSS_SELECTOR, "button")
+                        link2.click()
+                        break
+
+
+if __name__ == "__main__":
+    keys = {"usr": "toni.tort92@gmail.com", "pwd": "Superantonio92!"}
+
+    # clonar
+    driver1 = login(keys)
+    mine(driver1, "https://www.posterage.com/admin/catalogue/products/edit/0dee1cc7-8f17-490e-b001-07f550a74b2c")
+    # input("Press Enter to continue...")
+    # mine(driver1)
+    # driver1.get("https://www.posterage.com/admin/catalogue/products/create")
+    # input("Press Enter to continue...")
+    # creator(driver1)
+
+
