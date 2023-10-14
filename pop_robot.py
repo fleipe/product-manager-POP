@@ -1,3 +1,4 @@
+import json
 import threading
 import time
 import tkinter as tk
@@ -19,7 +20,8 @@ class AsyncApp:
         """
         self.root = root
         self.root.title("POP_robot")
-        self.keys = {"usr": "toni.tort92@gmail.com", "pwd": "Superantonio92!"}
+        with open("user_data", "r") as f:
+            self.keys = json.load(f)
         self.driver1 = login(self.keys)
         self.filename = ""
 
