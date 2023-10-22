@@ -41,4 +41,3 @@ This Python script utilizes Selenium to scrape information about products in YuP
    python pop_robot.py
 
 ### Feel free to contribute and open issues for any suggestions or improvements!
-## WARNING: Do not push to Master Branch!!
